@@ -39,76 +39,173 @@ This repository organizes the programming assignments into self-contained, conce
 
 ### Week 01: Practical Aspects of Deep Learning
 
+---
+
 #### 1. [Weight Initialization](Week%2001%20-%20Practical%20Aspects%20of%20Deep%20Learning/01%20-%20Weight%20Initialization/Weight_Initialization.ipynb)
 *Notebook:* `Weight_Initialization.ipynb`
 
-- **The Problem:** Poor weight initialization causes the activation outputs to either vanish (diminish to zero) or explode (overflow towards infinity) across deep layers, preventing gradients from flowing back during backpropagation.
-- **Implementations:**
-  - **Zero Initialization ($W = 0$):** Fails because all hidden units compute identical outputs ($\text{symmetry problem}$), resulting in identical gradients and preventing the network from learning diverse features.
-  - **Large Random Initialization ($W \sim \mathcal{N}(0, 1) \times 10$):** Leads to exploding activations and saturated non-linearities (e.g., sigmoid/tanh saturation), resulting in vanishing gradients and slow learning.
-  - **He Initialization ($W^{[l]} \sim \mathcal{N}(0, 1) \times \sqrt{\frac{2}{n^{[l-1]}}}$):** Specifically derived for ReLU activations to maintain variance of activations roughly constant across layers, enabling deep networks to converge reliably.
+**The Challenge:**
+Poor weight initialization causes activations to either vanish (diminish to zero) or explode (overflow towards infinity) across deep layers, preventing gradients from flowing back during backpropagation.
+
+**Techniques Implemented:**
+
+- **Zero Initialization ($W = 0$):**
+  Setting weights to zero fails because every hidden unit computes identical activations ($a_1^{[l]} = a_2^{[l]} = \dots$), meaning all neurons compute the exact same feature. Gradients remain identical across neurons, completely preventing the network from breaking symmetry.
+
+- **Large Random Initialization ($W \sim \mathcal{N}(0, 1) \times 10$):**
+  Multiplying Gaussian random weights by large constants produces extreme activation values. For sigmoid or tanh units, large inputs push activations into saturation regions ($\approx \pm 1$) where the derivative $\sigma'(z) \approx 0$, causing vanishing gradients and stalling training.
+
+- **He Initialization:**
+  For a layer $l$ with $n^{[l-1]}$ input features, weights are drawn from a normal distribution scaled by the number of inputs:
+
+$$
+W^{[l]} \sim \mathcal{N}\left(0, \sqrt{\frac{2}{n^{[l-1]}}}\right)
+$$
+
+  Specifically derived for ReLU activations ($g(z) = \max(0, z)$), He initialization preserves the variance of activations and backpropagated gradients throughout all layers, enabling deep architectures to converge smoothly.
 
 ---
 
 #### 2. [Regularization: L2 & Dropout](Week%2001%20-%20Practical%20Aspects%20of%20Deep%20Learning/02%20-%20Regularization/Regularization_L2_and_Dropout.ipynb)
 *Notebook:* `Regularization_L2_and_Dropout.ipynb`
 
-- **The Problem:** Deep networks have immense capacity and tend to overfit small training sets by memorizing noise rather than learning generalizable decision boundaries.
-- **Implementations:**
-  - **L2 Regularization (Weight Decay):** Augments the cost function with the Frobenius norm penalty:
-    $$\mathcal{J}_{\text{regularized}} = \mathcal{J} + \frac{\lambda}{2m} \sum_{l=1}^{L} \|W^{[l]}\|_F^2$$
-    This penalizes large weights during backpropagation ($dW^{[l]} = dW_{\text{standard}}^{[l]} + \frac{\lambda}{m} W^{[l]}$), shrinking parameter values towards zero and producing smoother, less complex decision surfaces.
-  - **Inverted Dropout:** During training, randomly deactivates each neuron with probability $1 - \text{keep\_prob}$ and scales the remaining activations by $\frac{1}{\text{keep\_prob}}$:
-    $$A^{[l]} = \frac{A^{[l]} * D^{[l]}}{\text{keep\_prob}}$$
-    This prevents neurons from relying on specific co-adaptations, forcing the network to learn robust, distributed representations. Inverted dropout ensures test-time computation requires no additional scaling.
+**The Challenge:**
+Deep neural networks have high capacity and easily overfit small training datasets by memorizing noise rather than learning generalizable decision boundaries.
+
+**Techniques Implemented:**
+
+- **L2 Regularization (Weight Decay):**
+  Augments the standard cross-entropy cost function with a penalty proportional to the Frobenius norm of all weight matrices:
+
+$$
+\mathcal{J}_{\text{regularized}} = \mathcal{J} + \frac{\lambda}{2m} \sum_{l=1}^{L} \|W^{[l]}\|_F^2
+$$
+
+  During backward propagation, the gradient calculation incorporates this penalty:
+
+$$
+dW^{[l]} = dW_{\text{standard}}^{[l]} + \frac{\lambda}{m} W^{[l]}
+$$
+
+  This effectively updates weights as $W^{[l]} := W^{[l]}\left(1 - \frac{\alpha \lambda}{m}\right) - \alpha dW_{\text{standard}}^{[l]}$, shrinking weights towards zero on each iteration (weight decay) to prevent individual neurons from exerting disproportionate influence.
+
+- **Inverted Dropout:**
+  During training, each hidden neuron is independently retained with probability $p$ (`keep_prob`) and silenced with probability $1 - p$. Forward activations are gated with a random binary dropout mask $D^{[l]} \sim \text{Bernoulli}(p)$:
+
+$$
+A^{[l]} = \frac{A^{[l]} \odot D^{[l]}}{p}
+$$
+
+  By dividing by $p$ during training, the expected value $\mathbb{E}[A^{[l]}]$ remains identical to non-dropout activations. Consequently, **no modification or scaling is needed at test time**. Inverted dropout forces neurons to learn robust features without relying on fragile co-adaptations.
 
 ---
 
 #### 3. [Gradient Checking](Week%2001%20-%20Practical%20Aspects%20of%20Deep%20Learning/03%20-%20Gradient%20Checking/Gradient_Checking.ipynb)
 *Notebook:* `Gradient_Checking.ipynb`
 
-- **The Problem:** Analytical backpropagation implementations can easily contain subtle mathematical or indexing errors that still allow the loss to decrease, but prevent the model from reaching optimal performance.
-- **Implementation:**
-  - Computes numerical gradient approximations using centered finite differences:
-    $$\frac{\partial \mathcal{J}}{\partial \theta_i} \approx \frac{\mathcal{J}(\theta_1, \dots, \theta_i + \epsilon, \dots) - \mathcal{J}(\theta_1, \dots, \theta_i - \epsilon, \dots)}{2\epsilon}$$
-  - Computes the normalized Euclidean relative difference:
-    $$\text{difference} = \frac{\| \text{grad} - \text{gradapprox} \|_2}{\| \text{grad} \|_2 + \| \text{gradapprox} \|_2}$$
-  - Verifies that $\text{difference} < 10^{-7}$, confirming the exactness of the analytical gradient implementation.
+**The Challenge:**
+Analytical backpropagation code is notoriously prone to subtle indexing, transposition, or sign bugs that may still decrease the cost function but converge to suboptimal solutions.
+
+**Technique Implemented:**
+
+- Computes two-sided finite difference approximations for each parameter $\theta_i$:
+
+$$
+\frac{\partial \mathcal{J}}{\partial \theta_i} \approx \frac{\mathcal{J}(\theta_1, \dots, \theta_i + \epsilon, \dots) - \mathcal{J}(\theta_1, \dots, \theta_i - \epsilon, \dots)}{2\epsilon}
+$$
+
+- Evaluates the normalized relative Euclidean distance between the numerical approximation vector $d\theta_{\text{approx}}$ and the analytical gradient vector $d\theta$:
+
+$$
+\text{difference} = \frac{\| d\theta - d\theta_{\text{approx}} \|_2}{\| d\theta \|_2 + \| d\theta_{\text{approx}} \|_2}
+$$
+
+- A calculated value of $\text{difference} < 10^{-7}$ confirms that the analytical gradient computation is mathematically exact.
 
 ---
 
 ### Week 02: Optimization Algorithms
 
+---
+
 #### 1. [Optimization Methods: Momentum, RMSprop & Adam](Week%2002%20-%20Optimization%20Algorithms/01%20-%20Optimization%20Methods/Optimization_Methods_Momentum_and_Adam.ipynb)
 *Notebook:* `Optimization_Methods_Momentum_and_Adam.ipynb`
 
-- **The Problem:** Batch Gradient Descent is slow on massive datasets and prone to pathological oscillations along steep ravines in parameter space.
-- **Implementations:**
-  - **Mini-Batch Gradient Descent:** Splits data into minibatches (e.g., 64, 128, 256) after random shuffling, allowing frequent parameter updates and taking advantage of vectorization.
-  - **Momentum:** Computes an exponentially weighted moving average of the gradients:
-    $$v_{dW} = \beta v_{dW} + (1 - \beta) dW, \quad W := W - \alpha v_{dW}$$
-    Dampens oscillations in high-curvature directions and accelerates along low-curvature directions.
-  - **RMSprop (Root Mean Square Propagation):** Normalizes updates by the running average of squared gradients:
-    $$s_{dW} = \beta_2 s_{dW} + (1 - \beta_2) (dW)^2, \quad W := W - \alpha \frac{dW}{\sqrt{s_{dW}} + \varepsilon}$$
-  - **Adam (Adaptive Moment Estimation):** Combines Momentum (first moment $v$) and RMSprop (second moment $s$) with bias correction for initial steps:
-    $$v_{dW}^{\text{corrected}} = \frac{v_{dW}}{1 - \beta_1^t}, \quad s_{dW}^{\text{corrected}} = \frac{s_{dW}}{1 - \beta_2^t}$$
-    $$W := W - \alpha \frac{v_{dW}^{\text{corrected}}}{\sqrt{s_{dW}^{\text{corrected}}} + \varepsilon}$$
-  - **Learning Rate Decay:** Implements scheduled learning rate decay ($\alpha = \frac{\alpha_0}{1 + \text{decay\_rate} \times \text{epoch}}$) to stabilize parameters around the global minimum.
+**The Challenge:**
+Standard Batch Gradient Descent computes gradients across the entire dataset before every step, leading to sluggish progress on large datasets and high-variance oscillations along steep ravine surfaces.
+
+**Techniques Implemented:**
+
+- **Mini-Batch Gradient Descent:**
+  Splits training data into randomly shuffled mini-batches of size $B$ (e.g., 64, 128, 256), taking parameter steps after each mini-batch to combine vectorized hardware efficiency with rapid progress.
+
+- **Gradient Descent with Momentum:**
+  Tracks an exponentially weighted moving average of past gradients to build velocity $v$:
+
+$$
+v_{dW} = \beta v_{dW} + (1 - \beta) dW
+$$
+
+$$
+W := W - \alpha v_{dW}
+$$
+
+  Momentum dampens high-frequency vertical oscillations while accelerating progress along the horizontal path towards the minimum.
+
+- **RMSprop (Root Mean Square Propagation):**
+  Divides parameter updates by the running square root of past squared gradients $s$:
+
+$$
+s_{dW} = \beta_2 s_{dW} + (1 - \beta_2) (dW)^2
+$$
+
+$$
+W := W - \alpha \frac{dW}{\sqrt{s_{dW}} + \varepsilon}
+$$
+
+- **Adam (Adaptive Moment Estimation):**
+  Combines the principles of Momentum (first moment $v$) and RMSprop (second moment $s$), incorporating bias correction for early iterations:
+
+$$
+v_{dW}^{\text{corrected}} = \frac{v_{dW}}{1 - \beta_1^t}, \quad s_{dW}^{\text{corrected}} = \frac{s_{dW}}{1 - \beta_2^t}
+$$
+
+$$
+W := W - \alpha \frac{v_{dW}^{\text{corrected}}}{\sqrt{s_{dW}^{\text{corrected}}} + \varepsilon}
+$$
+
+- **Learning Rate Decay:**
+  Schedules dynamic learning rate reduction over training epochs to prevent parameters from overshooting around the global optimum:
+
+$$
+\alpha = \frac{\alpha_0}{1 + k \times \text{epoch}}
+$$
+
+  where $k$ represents the decay rate hyperparameter (`decay_rate`).
 
 ---
 
 ### Week 03: Introduction to TensorFlow 2.x
 
+---
+
 #### 1. [TensorFlow 2.x & Deep Neural Networks](Week%2003%20-%20Introduction%20to%20TensorFlow/01%20-%20TensorFlow%20Basics%20and%20Deep%20NN/Introduction_to_TensorFlow2_and_Deep_NN.ipynb)
 *Notebook:* `Introduction_to_TensorFlow2_and_Deep_NN.ipynb`
 
-- **The Transition:** Moving from manual NumPy matrix derivations to an industry-grade automatic differentiation framework.
-- **Key Concepts Covered:**
-  - Eager execution and tensor manipulation with `tf.constant`, `tf.Variable`, and `tf.cast`.
-  - Automatic differentiation via `tf.GradientTape()` context manager.
-  - Efficient input pipelining with `tf.data.Dataset` (`.map()`, `.batch()`, `.prefetch()`).
-  - One-hot encoding using `tf.one_hot()`.
-  - Building, compiling, and training a 3-layer Deep Neural Network from scratch in TensorFlow 2 for multi-class classification on the **SIGNS dataset** (hand signs representing numbers 0 through 5).
+**The Transition:**
+Moving from low-level NumPy matrix derivations to an industry-grade automatic differentiation framework.
+
+**Key Concepts Covered:**
+
+- **Tensors & Variables:** Eager execution fundamentals with `tf.constant`, mutable `tf.Variable`, and type casting via `tf.cast`.
+- **Automatic Differentiation:** Recording forward operations with the `tf.GradientTape()` context manager to automatically compute analytical gradients:
+
+$$
+\nabla_{\theta} \mathcal{J}(\theta)
+$$
+
+- **Data Streaming Pipeline:** Utilizing `tf.data.Dataset` transformations (`.map()`, `.batch()`, `.prefetch()`) to eliminate I/O bottlenecks by pre-loading mini-batches into memory during GPU/CPU execution.
+- **End-to-End Deep Neural Network:** Building, compiling, and training a 3-layer neural network with Adam optimization and Categorical Crossentropy to classify sign language numbers (0 through 5) from the **SIGNS dataset**.
 
 ---
 
