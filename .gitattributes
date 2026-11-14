@@ -1,0 +1,17 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Source code & notebooks
+*.py text diff=python eol=lf
+*.ipynb text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Binary datasets & media
+*.h5 binary
+*.mat binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.mp4 binary
